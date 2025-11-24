@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hello Chatbot (Streaming)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 700px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      #chat {
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 0.75rem;
+        height: 350px;
+        overflow-y: auto;
+        background: #fafafa;
+      }
+      .message {
+        margin: 0.4rem 0;
+        white-space: pre-wrap;
+      }
+      .message.user {
+        font-weight: 600;
+      }
+      .message.assistant {
+        color: #222;
+      }
+      form {
+        margin-top: 0.75rem;
+        display: flex;
+        gap: 0.5rem;
+      }
+      input[type="text"] {
+        flex: 1;
+        padding: 0.5rem;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Hello Chatbot (Streaming)</h1>
+    <p>Type a message and watch the response stream in real time.</p>
+
+    <div id="chat"></div>
+
+    <form id="chat-form">
+      <input
+        id="message-input"
+        type="text"
+        autocomplete="off"
+        placeholder="Say hello..."
+        required
+      />
+      <button type="submit">Send</button>
+    </form>
+
+    <script>
+      const chat = document.getElementById("chat");
+      const form = document.getElementById("chat-form");
+      const input = document.getElementById("message-input");
+
+      function appendMessage(role, text) {
+        const div = document.createElement("div");
+        div.className = `message ${role}`;
+        div.textContent = text;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+        return div;
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+
+        // Show user message
+        appendMessage("user", text);
+        input.value = "";
+        input.focus();
+
+        // Create empty assistant message we’ll stream into
+        const assistantDiv = appendMessage("assistant", "");
+
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+
+        if (!res.body) {
+          assistantDiv.textContent = "[Error: no response body]";
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+
+        while (!done) {
+          const result = await reader.read();
+          done = result.done;
+          if (done) break;
+          const chunk = decoder.decode(result.value, { stream: true });
+          assistantDiv.textContent += chunk;
+          chat.scrollTop = chat.scrollHeight;
+        }
+      });
+    </script>
+  </body>
+</html>
+
